@@ -17,6 +17,6 @@ public class TestComputer {
         FlexibleGraph flexibleGraph3 = new GraphStreamGraph(graph3);
         GraphMeticsCompute<Node> compute3 = new GraphMeticsCompute<>(eachNode3, flexibleGraph3);
         System.out.println(compute3.MAX_DD_ENTROPY);
-        System.out.println(compute3.getDDEntropy(true));
+        System.out.println(compute3.getDDEntropy(false));
     }
 }

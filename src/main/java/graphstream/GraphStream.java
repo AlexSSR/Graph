@@ -25,7 +25,7 @@ public class GraphStream {
     public static void main(String[] args) {
 
         String userdir = System.getProperty("user.dir");
-        String userdirName = new File(userdir).getPath() + "\\src" + "\\main" + "\\resources\\";
+        String userdirName = new File(userdir).getPath() + "/src" + "/main" + "/resources/";
 
         GraphBuilder graphBuilder = new GraphBuilder();
 

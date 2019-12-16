@@ -33,11 +33,14 @@ public class GraphMeticsCompute<T> {
 
     public Double MAX_DD_ENTROPY;
 
+    public Double MAX_ENTROPY;
+
     public GraphMeticsCompute(Iterable<T> vertexIterator, FlexibleGraph graph) {
         this.vertexIterator = vertexIterator;
         this.graph = graph;
         this.vertexNumber = graph.getVertexSize();
         MAX_DD_ENTROPY = Math.log10(vertexNumber - 1);
+        MAX_ENTROPY = Math.log10(vertexNumber);
     }
 
     public void GraphDisplay() {
@@ -103,13 +106,10 @@ public class GraphMeticsCompute<T> {
     }
 
     private void dynamicProgramming() {
-
         if (degreeDistributeFunction == null) {
             initdegreeDistributeFunction();
         }
-
         Double probabilityIntegral = 0D;
-
         for (Map.Entry<Integer, Integer> entry : degreeMap.entrySet()) {
             Integer key = entry.getKey();
             Integer value = entry.getValue();
@@ -131,64 +131,68 @@ public class GraphMeticsCompute<T> {
         }
     }
 
-    private Double distributeFunctionComputeAltered(Integer degree) {
-        if (degreeDistributeFunction == null) {
-            initdegreeDistributeFunction();
-        }
-        if (degreeDistributeFunction.containsKey(degree)) {
-            return degreeDistributeFunction.get(degree);
-        }
-        if (degreeMap.firstKey() == degree && degreeDistributeFunction.get(degree) == null) {
-            degreeDistributeFunction.put(degree, degreeMap.get(degree) / vertexNumber.doubleValue());
-            return degreeDistributeFunction.get(degree);
-        }
-        if (degreeDistributeFunction.lowerKey(degree) != null) {
-            Integer lastKey = degreeDistributeFunction.lowerKey(degree);
-            Double lastSumValue = degreeDistributeFunction.get(lastKey);
-            degreeDistributeFunction.put(degree, lastSumValue + degreeMap.get(degree) / vertexNumber.doubleValue());
-            return degreeDistributeFunction.get(degree);
-        }
-
-        Double lastSumValue = distributeFunctionCompute(degreeMap.lowerKey(degree));
-        degreeDistributeFunction.put(degreeMap.lowerKey(degree), lastSumValue);
-        double currentValue = lastSumValue + degreeMap.get(degree) / vertexNumber.doubleValue();
-        degreeDistributeFunction.put(degree, currentValue);
-
-        return currentValue;
-    }
-
+    //求解离散型分布函数
     private Double distributeFunctionCompute(Integer degree) {
         if (degreeDistributeFunction == null) {
             initdegreeDistributeFunction();
         }
-
-        if (ExeactlyOnce.contains(degree)) {
-            return 1D;
-        }
-
         if (degreeDistributeFunction.containsKey(degree)) {
-            ExeactlyOnce.add(degree);
             return degreeDistributeFunction.get(degree);
         }
         if (degreeMap.firstKey() == degree && degreeDistributeFunction.get(degree) == null) {
             degreeDistributeFunction.put(degree, degreeMap.get(degree) / vertexNumber.doubleValue());
-            ExeactlyOnce.add(degree);
             return degreeDistributeFunction.get(degree);
         }
         if (degreeDistributeFunction.lowerKey(degree) != null) {
             Integer lastKey = degreeDistributeFunction.lowerKey(degree);
             Double lastSumValue = degreeDistributeFunction.get(lastKey);
             degreeDistributeFunction.put(degree, lastSumValue + degreeMap.get(degree) / vertexNumber.doubleValue());
-            ExeactlyOnce.add(degree);
             return degreeDistributeFunction.get(degree);
         }
-
         Double lastSumValue = distributeFunctionCompute(degreeMap.lowerKey(degree));
         degreeDistributeFunction.put(degreeMap.lowerKey(degree), lastSumValue);
         double currentValue = lastSumValue + degreeMap.get(degree) / vertexNumber.doubleValue();
         degreeDistributeFunction.put(degree, currentValue);
-        ExeactlyOnce.add(degree);
+        return currentValue;
+    }
 
+    //求解离散型分布函数的修正方法
+    private Double distributeFunctionComputeAltered(Integer degree, Boolean directCall) {
+        if (degreeDistributeFunction == null) {
+            initdegreeDistributeFunction();
+        }
+        if (ExeactlyOnce.contains(degree)) {
+            return 1D;
+        }
+        if (degreeDistributeFunction.containsKey(degree)) {
+            if (directCall) {
+                ExeactlyOnce.add(degree);
+            }
+            return degreeDistributeFunction.get(degree);
+        }
+        if (degreeMap.firstKey() == degree && degreeDistributeFunction.get(degree) == null) {
+            degreeDistributeFunction.put(degree, degreeMap.get(degree) / vertexNumber.doubleValue());
+            if (directCall) {
+                ExeactlyOnce.add(degree);
+            }
+            return degreeDistributeFunction.get(degree);
+        }
+        if (degreeDistributeFunction.lowerKey(degree) != null) {
+            Integer lastKey = degreeDistributeFunction.lowerKey(degree);
+            Double lastSumValue = degreeDistributeFunction.get(lastKey);
+            degreeDistributeFunction.put(degree, lastSumValue + degreeMap.get(degree) / vertexNumber.doubleValue());
+            if (directCall) {
+                ExeactlyOnce.add(degree);
+            }
+            return degreeDistributeFunction.get(degree);
+        }
+        Double lastSumValue = distributeFunctionComputeAltered(degreeMap.lowerKey(degree), false);
+        degreeDistributeFunction.put(degreeMap.lowerKey(degree), lastSumValue);
+        double currentValue = lastSumValue + degreeMap.get(degree) / vertexNumber.doubleValue();
+        degreeDistributeFunction.put(degree, currentValue);
+        if (directCall) {
+            ExeactlyOnce.add(degree);
+        }
         return currentValue;
     }
 
@@ -207,14 +211,14 @@ public class GraphMeticsCompute<T> {
         Double sum = 0d;
         for (T vertex : vertexIterator) {
             int degree = graph.getDegree(vertex);
-            double single = (degree + 1) * (1 - distributeFunctionCompute(degree)) + 1 / vertexNumber.doubleValue() * vertexNumber;
+            double single = (degree + 1) * (1 - distributeFunctionComputeProbability(degree)) + 1 / vertexNumber.doubleValue() * vertexNumber;
             sum += single;
         }
         return sum;
     }
 
+    //   - ∑ (N/V)*log(N/V)
     private double structEntropyCompute(AlgorithmLogic logic) {
-        //计算度和度的分布  - ∑(N/V)*log(N/V)
         //用于累加求和
         double entropy = 0D;
         //累加求和
@@ -238,7 +242,7 @@ public class GraphMeticsCompute<T> {
         if (openDynamicProgramming) {
             dynamicProgramming();
         }
-        AlgorithmLogic computeTopologyLogic = (degree) -> distributeFunctionCompute(degree);
+        AlgorithmLogic computeTopologyLogic = (degree) -> distributeFunctionComputeAltered(degree, true);
         return structEntropyCompute(computeTopologyLogic);
     }
 
@@ -262,7 +266,7 @@ public class GraphMeticsCompute<T> {
     public double getSDEntropy() {
         //计算度和度的分布(∑{(di+1)[1-p(di)]+delta})
         final double edgeAndVertexTotalValue = getEdgeAndVertexTotalValue();
-        AlgorithmLogic computeTopologyLogic = (degree) -> (((degree + 1) * (1 - distributeFunctionCompute(degree)) + 1 / vertexNumber.doubleValue() * vertexNumber) / edgeAndVertexTotalValue);
+        AlgorithmLogic computeTopologyLogic = (degree) -> (((degree + 1) * (1 - distributeFunctionComputeProbability(degree)) + 1 / vertexNumber.doubleValue() * vertexNumber) / edgeAndVertexTotalValue);
         return structEntropyCompute(computeTopologyLogic);
     }
 }
